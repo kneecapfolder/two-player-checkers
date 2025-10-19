@@ -1,20 +1,26 @@
+import socket
+import struct
 import customtkinter as tk
 from piece import *
 
 class Move:
-    def __init__():
-        pass
+    def __init__(self, p : Piece, x : int, y : int, taken=None):
+        self.p = p
+        self.x = x
+        self.y = y
+        self.taken = taken
 
 
 
 
 class BoardWindow:
-    def __init__(self, pieces : list[Piece], team : Team):
+    def __init__(self, sock : socket.socket, pieces : list[Piece], team : Team):
+        self.sock = sock
         self.pieces = pieces
         self.team = team
         self.selected = None
         self.possible_moves = []
-        self.turn = team == Team.BLUE
+        self.my_turn = team == Team.BLUE
 
         # Set theme
         tk.set_appearance_mode("Dark")
@@ -32,7 +38,9 @@ class BoardWindow:
         self.canvas.pack(padx=20, pady=20)
         self.canvas.bind('<Button-1>', self.on_canvas_click)
 
-        # Run app
+
+    # Run app
+    def start(self):
         self.draw_board()
         self.draw_pieces()
         self.root.mainloop()
@@ -59,8 +67,8 @@ class BoardWindow:
 
         for move in self.possible_moves:
             self.canvas.create_aa_circle(
-                move[0]*50+25,
-                move[1]*50+25,
+                move.x*50+25,
+                move.y*50+25,
                 6, fill='gray23'
             )
 
@@ -69,15 +77,22 @@ class BoardWindow:
     def get_possible_moves(self):
         self.possible_moves = []
         for offset in [(-1, -1), (1, -1)]:
-            if not self.find_piece(offset[0], offset[1]):
-                self.possible_moves.append(offset)
+            if not self.find_piece(self.selected.x+offset[0], self.selected.y+offset[1]):
+                self.possible_moves.append(
+                    Move(
+                        self.selected,
+                        self.selected.x+offset[0],
+                        self.selected.y+offset[1]
+                    )
+                )
 
 
     def find_piece(self, x : int, y : int) -> Piece:
-        for p in pieces:
+        for p in self.pieces:
             if p.x == x and p.y == y:
                 return p
         return None
+
 
     # +===============================+ change with board +===============================+
     def select_piece(self, p : Piece):
@@ -85,16 +100,30 @@ class BoardWindow:
             self.selected = None
             self.possible_moves = []
             return
-
         self.selected = p
         self.get_possible_moves()
 
     
-    def move_piece(move):
-        pass
+    def move_piece(self, move : Move):
+        self.select_piece(None)
+        self.my_turn = not self.my_turn
+
+        if not self.my_turn:
+            if move.taken:
+                data = struct.pack('6h', move.p.x, move.p.y, move.x, move.y, move.taken.x, move.taken.y)
+            else:
+                data = struct.pack('6h', move.p.x, move.p.y, move.x, move.y, -1, -1)
+            self.sock.sendall(data)
+        
+        (move.p.x, move.p.y) = (move.x, move.y)
+        if move.taken:
+            self.pieces.remove(move.taken)
 
 
     def on_canvas_click(self, event):
+        if not self.my_turn:
+            return
+
         x = event.x // 50
         y = event.y // 50
         print(x, y)
@@ -115,9 +144,8 @@ class BoardWindow:
             
             # Try to move
             for option in self.possible_moves:
-                if (x, y) == option:
-                    (self.selected.x, self.selected.y) = option
-                    self.select_piece(None)
+                if (x, y) == (option.x, option.y):
+                    self.move_piece(option)
                     return
 
         # Select new piece
