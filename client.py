@@ -8,14 +8,10 @@ PORT = 12345
 
 def listen_to_move(sock : socket.socket, board : BoardWindow):
     while True:
-        data = sock.recv(12)
+        data = sock.recv(6)
         print('boom')
-        px, py, x, y, taken_x, taken_y = struct.unpack('6h', data)
-        if px != -1:
-            move = Move(board.find_piece(7-px, 7-py), 7-x, 7-y, board.find_piece(7-taken_x, 7-taken_y))
-        else:
-            move = Move(board.find_piece(7-px, 7-py), 7-x, 7-y)
-        board.move_piece(move)
+        id, x, y = struct.unpack('3h', data)
+        board.move_piece(board.get_by_id(id), Vector(7-x, 7-y))
         board.draw_board()
         board.draw_pieces()
 
@@ -25,13 +21,15 @@ if __name__ == '__main__':
     sock.connect((HOST, PORT))
 
     pieces = []
+    Piece.counter = 1
     for y in range(3):
         for x in range(1, 8, 2):
-            pieces.append(Piece(x-y%2, y, Team.BLUE))
+            pieces.append(Piece(7-x+y%2, 7-y, Team.RED))
     
     for y in range(3):
         for x in range(0, 7, 2):
-            pieces.append(Piece(x+y%2, y+5, Team.RED))
+            pieces.append(Piece(7-x-y%2, 2-y, Team.BLUE))
+    
 
     board = BoardWindow(sock, pieces, Team.RED)
     threading.Thread(target=listen_to_move, args=(sock, board), daemon=True).start()

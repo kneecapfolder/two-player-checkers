@@ -1,15 +1,19 @@
 from enum import Enum
 from customtkinter import CTkCanvas
+from vector import *
 
 class Team(Enum):
     BLUE = 1
     RED = 2
 
-class Piece:
+class Piece(Vector):
+    counter = 1
+
     def __init__(self, x : int, y : int, team : Team):
-        self.x = x
-        self.y = y
+        super().__init__(x, y)
         self.team = team
+        self.id = Piece.counter
+        Piece.counter += 1
 
 
     def draw(self, canvas : CTkCanvas):
